@@ -1,25 +1,22 @@
 #include <Arduino.h>
 #include <RTClib.h>
 #include <NTPClient.h>
+#include <WiFiManager.h>
 #include <WiFiS3.h>
 #include <WiFiUdp.h>
-#include <Preferences.h>
-#include "secrets.hpp"
 
 // #define DEBUG_NTPClient
 
-char ssid[] = SECRET_SSID;
-char pass[] = SECRET_PASS;
 int timeZoneOffsetHours = -9;
 
-int wifiStatus = WL_IDLE_STATUS;
 WiFiUDP udp;
 NTPClient timeClient(udp);
+WiFiManager wifiMgr;
 
 RTC_DS3231 rtc;
 
-Preferences preferences;
-const char *prefName = "nixie";
+uint32_t lastClockPrintAt = 0;
+uint32_t lastWifiWaitStatusAt = 0;
 
 // The Fatal Error Handler
 void panic(const char *errorMessage)
@@ -59,7 +56,7 @@ void printWifiStatus()
   Serial.println(" dBm");
 }
 
-void connectToWiFi()
+void checkWiFiHardware()
 {
   // check for the WiFi module:
   if (WiFi.status() == WL_NO_MODULE)
@@ -75,21 +72,28 @@ void connectToWiFi()
   {
     Serial.println("Please upgrade the firmware");
   }
+}
 
-  // attempt to connect to WiFi network:
-  while (wifiStatus != WL_CONNECTED)
+void serviceWifiFor(uint32_t durationMs)
+{
+  const uint32_t startedAt = millis();
+  while (millis() - startedAt < durationMs)
   {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
-    // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
-    wifiStatus = WiFi.begin(ssid, pass);
-
-    // wait 10 seconds for connection:
-    delay(10000);
+    wifiMgr.loop();
+    delay(10);
   }
+}
 
-  Serial.println("Connected to WiFi");
-  printWifiStatus();
+void printWifiWaitStatus()
+{
+  Serial.print(F("WiFi wait status="));
+  Serial.print(WiFi.status());
+  Serial.print(F(" localIP="));
+  Serial.print(WiFi.localIP());
+  Serial.print(F(" softAPIP="));
+  Serial.print(WiFi.softAPIP());
+  Serial.print(F(" apSSID="));
+  Serial.println(WiFi.softAPSSID());
 }
 
 //****************************************************************************
@@ -124,19 +128,32 @@ void setup()
   }
   Serial.println("System Initialized.");
 
-  //-----[ Load Preferences ]-----------------------------------------------
-  Serial.print("Reading preferences: ");
-  Serial.print(prefName);
-  Serial.println();
-
-  preferences.begin(prefName, false);
-  size_t entriesFree = preferences.freeEntries();
-  Serial.print("Free entries: ");
-  Serial.print(entriesFree);
-  Serial.println();
-
   //-----[ Setup Wifi ]-----------------------------------------------------
-  connectToWiFi();
+  checkWiFiHardware();
+
+  wifiMgr.settings().registerInt("tz_offset", "Timezone offset (hours)", -9, -12, 14);
+  wifiMgr.settings().registerBool("hour24", "24-hour mode", true);
+  wifiMgr.settings().registerInt("brightness", "Nixie brightness", 128, 0, 255);
+  Serial.println(F("Starting WiFi manager."));
+  wifiMgr.begin();
+  Serial.println(F("WiFi manager started."));
+  printWifiWaitStatus();
+
+  Serial.println("Waiting for WiFi connection. Use the setup AP if needed.");
+  while (!wifiMgr.isConnected())
+  {
+    wifiMgr.loop();
+    if (millis() - lastWifiWaitStatusAt >= 5000)
+    {
+      lastWifiWaitStatusAt = millis();
+      printWifiWaitStatus();
+    }
+    delay(10);
+  }
+
+  timeZoneOffsetHours = wifiMgr.settings().getInt("tz_offset");
+  Serial.println("Connected to WiFi");
+  printWifiStatus();
 
   if (!rtc.begin())
   {
@@ -154,7 +171,7 @@ void setup()
     {
       panic("Unable to connect to NTP server");
     }
-    delay(500);
+    serviceWifiFor(500);
   }
   auto unixTime = timeClient.getEpochTime();
   if (0 == unixTime || -1 == unixTime)
@@ -176,6 +193,14 @@ void setup()
 //****************************************************************************
 void loop()
 {
+  wifiMgr.loop();
+
+  if (millis() - lastClockPrintAt < 10000)
+  {
+    return;
+  }
+  lastClockPrintAt = millis();
+
   // Fetch the current date and time from the RTC
   DateTime now = rtc.now();
 
@@ -198,6 +223,4 @@ void loop()
   Serial.print(" - Temp: ");
   Serial.print(rtc.getTemperature());
   Serial.println();
-
-  delay(1000); // Wait 1 second before reading the time again
 }

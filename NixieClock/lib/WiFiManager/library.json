@@ -1,0 +1,23 @@
+{
+  "name": "NixieClockWiFiManager",
+  "version": "0.1.0",
+  "description": "Self-contained WiFi provisioning and configuration portal for Arduino UNO R4 WiFi.",
+  "keywords": [
+    "wifi",
+    "provisioning",
+    "captive-portal",
+    "uno-r4-wifi"
+  ],
+  "authors": [
+    {
+      "name": "Nixie Clock"
+    }
+  ],
+  "frameworks": "arduino",
+  "platforms": "renesas-ra",
+  "headers": [
+    "WiFiManager.h",
+    "CredentialStore.h",
+    "SettingsRegistry.h"
+  ]
+}

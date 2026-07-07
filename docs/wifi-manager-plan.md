@@ -13,7 +13,7 @@ A self-contained WiFi provisioning and configuration-portal library for the Ardu
 ## Design Decisions (from clarifying Q&A)
 
 | Concern | Decision |
-|---|---|
+| ------- | -------- |
 | Portal UX | AutoConnect-style captive portal (DNS hijack) |
 | AP credentials | Hardcoded SSID + password (WPA2, ≥8 chars) |
 | Storage | `Preferences` API with light XOR obfuscation |
@@ -29,7 +29,7 @@ A self-contained WiFi provisioning and configuration-portal library for the Ardu
 
 Add a local PlatformIO library — PIO's LDF picks this up automatically via `lib/`:
 
-```
+```text
 NixieClock/
   lib/
     WiFiManager/
@@ -101,7 +101,7 @@ private:
 ### Routes (AP mode)
 
 | Route | Purpose |
-|---|---|
+| ----- | ------- |
 | `GET /` | SSID scan list + form (SSID dropdown/text + password field) |
 | `POST /connect` | Attempt `WiFi.begin(submitted)`; on success, persist, show "connected, IP=x.x.x.x, rebooting to STA mode"; on failure, redirect back with error |
 | `GET *` | Catch-all — captive-portal detection endpoints (`/generate_204`, `/hotspot-detect.html`, `/connecttest.txt`) all get the config page |
@@ -109,7 +109,7 @@ private:
 ### Routes (STA mode via ConfigPortal)
 
 | Route | Purpose |
-|---|---|
+| ----- | ------- |
 | `GET /` | Status page + links |
 | `GET /wifi` | Change WiFi (same form as AP) |
 | `GET /settings` | Dynamic form generated from `SettingsRegistry` |
